@@ -1,0 +1,6 @@
+{
+  "name": "FasMova POS",
+  "description": "Commercial-grade retail POS, inventory, multi-branch, M-Pesa payments & offline synchronization platform for SMBs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
