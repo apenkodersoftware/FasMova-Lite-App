@@ -66,8 +66,22 @@ abstract class FasMovaPOSDatabase : RoomDatabase() {
   abstract fun syncQueueDao(): SyncQueueDao
 
   companion object {
-    const val VERSION = 4
-    const val DATABASE_NAME = "fasmovapos_database"
+    const val VERSION = 5
+    const val DATABASE_NAME = "fasmovalite_database"
+
+    /** Existing values retain their original whole-unit meaning; Lite loose goods opt into scale 1000. */
+    internal val MIGRATION_4_5 =
+      object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+          db.execSQL("ALTER TABLE products ADD COLUMN quantityScale INTEGER NOT NULL DEFAULT 1")
+          db.execSQL("ALTER TABLE products ADD COLUMN quarterPrice REAL NOT NULL DEFAULT 0")
+          db.execSQL("ALTER TABLE products ADD COLUMN halfPrice REAL NOT NULL DEFAULT 0")
+          db.execSQL("ALTER TABLE products ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+          db.execSQL("ALTER TABLE sale_items ADD COLUMN quantityScale INTEGER NOT NULL DEFAULT 1")
+          db.execSQL("ALTER TABLE sale_items ADD COLUMN quantityUnit TEXT NOT NULL DEFAULT 'Pcs'")
+          db.execSQL("ALTER TABLE sale_items ADD COLUMN pricingQuantity INTEGER NOT NULL DEFAULT 1")
+        }
+      }
 
     /** v2 adds per-leg payments (split payments, Airtel Money). Existing sales are kept as-is. */
     internal val MIGRATION_1_2 =
@@ -117,7 +131,7 @@ abstract class FasMovaPOSDatabase : RoomDatabase() {
               context.applicationContext,
               FasMovaPOSDatabase::class.java,
               DATABASE_NAME,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
         dbInstance = instance
         instance

@@ -33,11 +33,11 @@ class TranslationCoverageTest {
   }
 
   @Test
-  fun bothTermsDocumentsIdentifyMaliMaliAndKeepAllElevenSections() {
+  fun bothTermsDocumentsIdentifyFasMovaLiteAndKeepAllElevenSections() {
     for (folder in listOf("values", "values-sw")) {
       val body = resources(folder).getValue("terms_body")
-      assertTrue(body.contains("MALIMALI"))
-      assertFalse(body.contains("FasMova", ignoreCase = true))
+      assertTrue(body.contains("FASMOVA LITE"))
+      assertFalse(body.contains("MaliMali", ignoreCase = true))
       for (section in 1..11) assertTrue("Missing section $section in $folder", body.contains("$section. "))
     }
   }

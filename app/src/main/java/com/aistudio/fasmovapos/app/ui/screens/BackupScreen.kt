@@ -118,7 +118,7 @@ fun BackupScreen(
       askingBackupPassword = true
     }
     ActionCard(R.string.export_sales, R.string.export_sales_hint, "backup_export_button", enabled) {
-      saveCsvLauncher.launch("FasMova-sales-$stamp.csv")
+      saveCsvLauncher.launch("FasMova-Lite-sales-$stamp.csv")
     }
     ActionCard(R.string.restore_backup, R.string.restore_backup_hint, "backup_restore_button", enabled) {
       pickBackupLauncher.launch(arrayOf("*/*"))
@@ -131,7 +131,7 @@ fun BackupScreen(
       onConfirm = { password ->
         askingBackupPassword = false
         pending = PendingAction.SavingBackup(password)
-        saveBackupLauncher.launch("FasMova-backup-$stamp.fmbk")
+        saveBackupLauncher.launch("FasMova-Lite-backup-$stamp.flbk")
       },
     )
   }

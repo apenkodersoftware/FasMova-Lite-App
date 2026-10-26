@@ -1,6 +1,5 @@
 package com.aistudio.fasmovapos.app.ui.simple
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +16,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +35,7 @@ import java.util.TimeZone
 data class TodayData(
   val sales: List<SaleEntity>,
   val payments: List<SalePaymentEntity>,
+  val reportInput: ReportInput = ReportInput(sales, payments, emptyList(), emptyList(), emptyList()),
 )
 
 data class TodaySummary(
@@ -90,6 +89,8 @@ fun TodayScreen(
   onHistory: () -> Unit,
   onReceipt: (SaleEntity) -> Unit,
   modifier: Modifier = Modifier,
+  onExpense: () -> Unit = {},
+  onDebts: () -> Unit = {},
 ) {
   val now by produceState(initialValue = System.currentTimeMillis()) {
     while (true) {
@@ -99,23 +100,13 @@ fun TodayScreen(
   }
   val summary = remember(data.sales, data.payments, now) { todaySummary(data.sales, data.payments, now) }
   LazyColumn(modifier = modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    item {
-      Text(stringResource(R.string.simple_today_sales), style = MaterialTheme.typography.headlineSmall)
-      Text(
-        simpleMoney(summary.total),
-        fontSize = 30.sp,
-        lineHeight = 38.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.testTag("simple_today_total"),
-      )
-      Text(stringResource(R.string.simple_sale_count, summary.sales.size), fontSize = 18.sp, lineHeight = 26.sp)
-    }
-    item {
-      TodayAmount(R.string.simple_cash, summary.cash)
-      TodayAmount(R.string.simple_mpesa, summary.mpesa)
-      TodayAmount(R.string.simple_credit, summary.credit)
-      if (summary.other != 0.0) TodayAmount(R.string.simple_other_payments, summary.other)
-    }
+    item { Text(stringResource(R.string.lite_today_summary), style = MaterialTheme.typography.headlineSmall) }
+    item { BusinessPanel(businessReport(data.reportInput, reportWindow(ReportPeriod.DAY, now))) }
+    item { ReceiptsPanel(businessReport(data.reportInput, reportWindow(ReportPeriod.DAY, now))) }
+    item { TextButton(onClick = onExpense, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lite_add_expense)) } }
+    item { TextButton(onClick = onDebts, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lite_debts)) } }
+    item { TextButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.lite_report)) } }
+    item { Text(stringResource(R.string.lite_estimate_note)) }
     if (summary.sales.isEmpty()) {
       item { Text(stringResource(R.string.simple_no_sales_today), fontSize = 16.sp) }
     }
@@ -142,17 +133,4 @@ fun TodayScreen(
       ) { Text(stringResource(R.string.simple_full_reports), fontSize = 16.sp) }
     }
   }
-}
-
-@Composable
-private fun TodayAmount(
-  @StringRes label: Int,
-  amount: Double,
-) {
-  Text(
-    stringResource(R.string.simple_label_amount, stringResource(label), simpleMoney(amount)),
-    fontSize = 18.sp,
-    lineHeight = 26.sp,
-    modifier = Modifier.padding(vertical = 8.dp),
-  )
 }

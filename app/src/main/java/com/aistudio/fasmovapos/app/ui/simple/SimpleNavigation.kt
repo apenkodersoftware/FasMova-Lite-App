@@ -135,8 +135,8 @@ fun SimpleMoreMenu(
   val destinations =
     listOf(
       "EXPENSES" to R.string.simple_expenses,
-      "CUSTOMERS" to R.string.simple_customers,
-      "SUPPLIERS" to R.string.simple_suppliers,
+      "CUSTOMERS" to R.string.lite_debts,
+      "REPORTS" to R.string.lite_report,
       "BACKUP" to R.string.simple_backup,
     )
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {

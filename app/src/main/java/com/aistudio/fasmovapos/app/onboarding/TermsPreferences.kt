@@ -15,14 +15,14 @@ import java.io.IOException
 
 private val Context.onboardingDataStore by preferencesDataStore(name = "fasmovapos_onboarding")
 
-/** The current MaliMali document must be explicitly accepted, including after an older acceptance. */
+/** The current FasMova Lite document must be explicitly accepted, including after an older acceptance. */
 class TermsPreferences internal constructor(
   private val store: DataStore<Preferences>,
 ) {
   constructor(context: Context) : this(context.onboardingDataStore)
 
   private val acceptedKey = booleanPreferencesKey("has_accepted_terms")
-  private val revisionKey = intPreferencesKey("accepted_malimali_terms_revision")
+  private val revisionKey = intPreferencesKey("accepted_fasmovalite_terms_revision")
 
   val hasAcceptedTerms: Flow<Boolean> =
     store.data
@@ -38,6 +38,6 @@ class TermsPreferences internal constructor(
   }
 
   companion object {
-    const val CURRENT_REVISION = 20261025
+    const val CURRENT_REVISION = 20261026
   }
 }

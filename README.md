@@ -4,7 +4,7 @@ Android app for a small retail shop: simple product tiles, piece/weight/volume s
 
 ## Development status
 
-The initial repository checkpoint is the reusable MaliMali/FasMova foundation with a separate Lite application identity. **FasMova Lite fractional sales, partial-credit checkout and the requested business-summary adaptation are implementation work in progress. No green Lite APK is claimed at this checkpoint.**
+The candidate implementation now includes measured piece/weight/volume stock, proportional and portion pricing, money-based quotes, partial-credit checkout, repayments and account history, favourites and business reporting. **Full verification is in progress. No green Lite APK is claimed at this checkpoint.**
 
 The source snapshot came from MaliMali commit 8e32bb363e3dbeb1a880e54d15fe328ee32d439d. Its historical checks are not verification of this new app. Original applications are not modified by this checkout.
 

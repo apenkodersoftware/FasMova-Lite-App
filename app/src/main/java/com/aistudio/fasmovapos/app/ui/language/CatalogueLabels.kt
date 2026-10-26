@@ -6,25 +6,41 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.aistudio.fasmovapos.app.R
 
+private val PRODUCT_LABELS =
+  mapOf(
+    ("lite-sugar" to "Loose sugar") to R.string.lite_product_sugar,
+    ("lite-rice" to "Loose rice") to R.string.lite_product_rice,
+    ("lite-beans" to "Loose beans") to R.string.lite_product_beans,
+    ("lite-oil" to "Loose liquid cooking oil") to R.string.lite_product_oil,
+    ("lite-fat" to "Solid cooking fat") to R.string.lite_product_fat,
+    ("lite-milk" to "Fresh milk packet") to R.string.lite_product_milk,
+    ("lite-bread" to "Bread loaf") to R.string.lite_product_bread,
+    ("lite-flour" to "Maize flour 2 kg packet") to R.string.lite_product_flour,
+    ("lite-salt" to "Salt 500 g packet") to R.string.lite_product_salt,
+    ("lite-tea" to "Tea leaves 100 g packet") to R.string.lite_product_tea,
+    ("lite-water" to "Water 500 ml bottle") to R.string.lite_product_water,
+    ("lite-soda" to "Bottled soda") to R.string.lite_product_soda,
+    ("lite-tissue" to "Tissue roll") to R.string.lite_product_tissue,
+    ("lite-matches" to "Matchbox") to R.string.lite_product_matches,
+    ("lite-eggs" to "Single egg") to R.string.lite_product_eggs,
+    ("p-1" to "Plastic basin") to R.string.catalog_basin,
+    ("p-2" to "Bucket with lid") to R.string.catalog_bucket,
+    ("p-3" to "Stainless steel bowl") to R.string.catalog_bowl,
+    ("p-4" to "Ceramic mug") to R.string.catalog_mug,
+    ("p-5" to "Dinner plate") to R.string.catalog_plate,
+    ("p-6" to "Household broom") to R.string.catalog_broom,
+    ("p-7" to "Laundry soap bar") to R.string.catalog_soap,
+    ("p-8" to "Clothes pegs packet") to R.string.catalog_pegs,
+    ("p-9" to "Exercise book") to R.string.catalog_book,
+    ("p-10" to "LED bulb") to R.string.catalog_bulb,
+  )
+
 /** Display aliases only: never rename persisted products, categories or historical sale items. */
 @StringRes
 fun productNameResource(
   id: String,
   name: String,
-): Int? =
-  when (id to name) {
-    "p-1" to "Plastic basin" -> R.string.catalog_basin
-    "p-2" to "Bucket with lid" -> R.string.catalog_bucket
-    "p-3" to "Stainless steel bowl" -> R.string.catalog_bowl
-    "p-4" to "Ceramic mug" -> R.string.catalog_mug
-    "p-5" to "Dinner plate" -> R.string.catalog_plate
-    "p-6" to "Household broom" -> R.string.catalog_broom
-    "p-7" to "Laundry soap bar" -> R.string.catalog_soap
-    "p-8" to "Clothes pegs packet" -> R.string.catalog_pegs
-    "p-9" to "Exercise book" -> R.string.catalog_book
-    "p-10" to "LED bulb" -> R.string.catalog_bulb
-    else -> null
-  }
+): Int? = PRODUCT_LABELS[id to name]
 
 fun localizedProductName(
   context: Context,
@@ -41,6 +57,9 @@ fun productLabel(
 @StringRes
 private fun categoryResource(category: String): Int? =
   when (category) {
+    "Food", "Vyakula" -> R.string.lite_category_food
+    "Drinks", "Vinywaji" -> R.string.lite_category_drinks
+    "Personal care", "Usafi binafsi" -> R.string.lite_category_personal
     "Household", "Vifaa vya nyumbani" -> R.string.category_household
     "Kitchenware", "Vyombo vya jikoni" -> R.string.category_kitchen
     "Cleaning", "Vifaa vya usafi" -> R.string.category_cleaning
@@ -55,6 +74,9 @@ private fun categoryResource(category: String): Int? =
 /** UI grouping only: equivalent built-in category labels share one filter without rewriting records. */
 fun categoryKey(category: String): String =
   when (categoryResource(category)) {
+    R.string.lite_category_food -> "Food"
+    R.string.lite_category_drinks -> "Drinks"
+    R.string.lite_category_personal -> "Personal care"
     R.string.category_household -> "Household"
     R.string.category_kitchen -> "Kitchenware"
     R.string.category_cleaning -> "Cleaning"

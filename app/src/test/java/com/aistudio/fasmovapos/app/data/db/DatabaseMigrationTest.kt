@@ -80,16 +80,34 @@ class DatabaseMigrationTest {
   }
 
   @Test
+  fun migrate4To5_preservesWholeItemsAndAddsExplicitScale() {
+    helper.createDatabase(dbName, 4).apply {
+      execSQL(
+        "INSERT INTO products (id,sku,barcode,name,category,unit,costPrice,sellingPrice,stockQuantity,minStockThreshold,branchId,isSynced,updatedAt) VALUES ('p','P','','Rice','Food','Kg',100,160,10,1,'b-1',0,0)",
+      )
+      close()
+    }
+    val db = helper.runMigrationsAndValidate(dbName, 5, true, FasMovaPOSDatabase.MIGRATION_4_5)
+    db.query("SELECT stockQuantity,quantityScale,isFavorite FROM products WHERE id = 'p'").use {
+      assertTrue(it.moveToFirst())
+      assertEquals(10, it.getInt(0))
+      assertEquals(1, it.getInt(1))
+      assertEquals(0, it.getInt(2))
+    }
+  }
+
+  @Test
   fun migrateFromVersion1ToCurrent_runsTheWholeChain() {
     helper.createDatabase(dbName, 1).close()
 
     helper.runMigrationsAndValidate(
       dbName,
-      4,
+      FasMovaPOSDatabase.VERSION,
       true,
       FasMovaPOSDatabase.MIGRATION_1_2,
       FasMovaPOSDatabase.MIGRATION_2_3,
       FasMovaPOSDatabase.MIGRATION_3_4,
+      FasMovaPOSDatabase.MIGRATION_4_5,
     )
   }
 }

@@ -33,11 +33,11 @@ class SimpleNavigationTest {
   }
 
   @Test
-  fun moreKeepsExistingBusinessScreensWithoutStaff() {
+  fun moreOpensBusinessSummaryWithoutStaff() {
     var selected = ""
     composeRule.setContent { FasMovaPOSTheme { SimpleMoreMenu(onNavigate = { selected = it }) } }
     composeRule.onNodeWithText("Staff").assertDoesNotExist()
-    composeRule.onNodeWithText("Suppliers").performClick()
-    assertEquals("SUPPLIERS", selected)
+    composeRule.onNodeWithText("Business summary").performClick()
+    assertEquals("REPORTS", selected)
   }
 }

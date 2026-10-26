@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.fasmovapos.app.BackupTab
 import com.aistudio.fasmovapos.app.R
+import com.aistudio.fasmovapos.app.data.repository.ProductMeasure
 import com.aistudio.fasmovapos.app.ui.FasMovaPOSViewModel
 import com.aistudio.fasmovapos.app.ui.components.DisplayControl
 import com.aistudio.fasmovapos.app.ui.components.ReceiptModal
@@ -42,7 +43,7 @@ fun SimpleMainShell(
 ) {
   val storedTab by viewModel.currentTab.collectAsStateWithLifecycle()
   val primaryTabs = setOf("POS", "INVENTORY", "TODAY", "MORE")
-  val secondaryTabs = setOf("EXPENSES", "CUSTOMERS", "SUPPLIERS", "BACKUP", "SALES")
+  val secondaryTabs = setOf("EXPENSES", "CUSTOMERS", "SUPPLIERS", "BACKUP", "SALES", "REPORTS")
   val currentTab = storedTab.takeIf { it in primaryTabs || it in secondaryTabs } ?: "MORE"
   var returnTab by rememberSaveable { mutableStateOf("MORE") }
   BackHandler(enabled = currentTab != "POS") { viewModel.setTab(if (currentTab in primaryTabs) "POS" else returnTab) }
@@ -62,6 +63,14 @@ fun SimpleMainShell(
   val lastSaleItems by viewModel.lastSaleItems.collectAsStateWithLifecycle()
   val lastSalePayments by viewModel.lastSalePayments.collectAsStateWithLifecycle()
   val salePayments by viewModel.salePayments.collectAsStateWithLifecycle()
+  val reportInput =
+    ReportInput(
+      sales.filter { it.branchId == currentBranch.id },
+      salePayments,
+      expenses.filter { it.branchId == currentBranch.id },
+      customerPayments,
+      customers,
+    )
 
   val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -116,12 +125,20 @@ fun SimpleMainShell(
             )
           "TODAY" ->
             TodayScreen(
-              data = TodayData(sales.filter { it.branchId == currentBranch.id }, salePayments),
+              data = TodayData(sales.filter { it.branchId == currentBranch.id }, salePayments, reportInput),
               onHistory = {
                 returnTab = "TODAY"
-                viewModel.setTab("SALES")
+                viewModel.setTab("REPORTS")
               },
               onReceipt = viewModel::showReceipt,
+              onExpense = {
+                returnTab = "TODAY"
+                viewModel.setTab("EXPENSES")
+              },
+              onDebts = {
+                returnTab = "TODAY"
+                viewModel.setTab("CUSTOMERS")
+              },
             )
           "POS" ->
             SimpleSellScreen(onOpenStock = { viewModel.setTab("INVENTORY") }, onOpenCustomers = {
@@ -133,9 +150,35 @@ fun SimpleMainShell(
             SimpleStockScreen(
               state = StockState(products.filter { it.branchId == currentBranch.id }),
               onAdd = { item ->
-                viewModel.addNewProduct(item.sku, "", item.name, item.category, "Pcs", item.cost, item.price, item.quantity, item.threshold)
+                viewModel.addMeasuredProduct(
+                  item.sku,
+                  item.name,
+                  item.category,
+                  item.cost,
+                  item.price,
+                  item.quantity,
+                  item.threshold,
+                  ProductMeasure(item.quantityScale, item.quarterPrice, item.halfPrice, item.unit),
+                )
               },
-              onAdjust = viewModel::adjustStock,
+              onAdjust = { id, delta, cost, price -> viewModel.adjustStock(id, delta, cost, price) },
+              onMeasuredAdjust = { product, delta, cost, price, quarter, half ->
+                viewModel.adjustStock(product.id, delta, cost, price, quarter, half)
+              },
+              onFavorite = viewModel::setFavorite,
+            )
+
+          "REPORTS" ->
+            BusinessReportScreen(
+              reportInput,
+              onExpense = {
+                returnTab = "REPORTS"
+                viewModel.setTab("EXPENSES")
+              },
+              onDebts = {
+                returnTab = "REPORTS"
+                viewModel.setTab("CUSTOMERS")
+              },
             )
 
           "SALES" ->
@@ -169,6 +212,7 @@ fun SimpleMainShell(
             CustomersScreen(
               customers = customers,
               payments = customerPayments,
+              records = DebtRecords(sales, salePayments),
               onAddCustomer = { name, phone, email, limit ->
                 viewModel.addNewCustomer(name, phone, email, limit)
               },

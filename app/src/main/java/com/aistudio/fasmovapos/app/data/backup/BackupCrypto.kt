@@ -28,7 +28,7 @@ class BackupFormatException(
  * reopen the file is stored in the header, so key-derivation settings can change in future versions.
  */
 object BackupCrypto {
-  private val MAGIC = byteArrayOf('F'.code.toByte(), 'M'.code.toByte(), 'B'.code.toByte(), 'K'.code.toByte())
+  private val MAGIC = byteArrayOf('F'.code.toByte(), 'L'.code.toByte(), 'B'.code.toByte(), 'K'.code.toByte())
   private const val FORMAT_VERSION = 1
   private const val KDF_SHA256 = 1
   private const val KDF_SHA1 = 2

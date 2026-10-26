@@ -1,6 +1,6 @@
 # FasMova Lite: required loose-goods sales
 
-26 October 2026. Confirmed product requirement, with a proposed implementation design. No Android quantity implementation or new APK has been produced by this note.
+26 October 2026. Confirmed product requirement, with a proposed implementation design. The candidate Android implementation is in work/fasmova-lite; complete build and emulator verification are in progress. No green APK is claimed by this note.
 
 ## Product decision
 
@@ -29,7 +29,7 @@ Physical form does not determine price automatically. Solid cooking fat sold by 
 
 ## Exact units and money
 
-Use an explicit measurement dimension, an integer base quantity and an explicit base-unit scale. Use checked Long arithmetic for stored base quantities; keep decimal display and rate arithmetic in an exact decimal representation. Do not fix the current whole-item model by changing every quantity to binary Double.
+Use an explicit measurement unit/dimension, an integer base quantity and an explicit base-unit scale. The first implementation retains bounded integer quantity columns for compatibility with the foundation, with a maximum of 2,147,483,647 base units per product. Parsing and adjustment limits reject overflow; combined quantities and stock arithmetic use Long. Decimal display and rate arithmetic use exact decimal calculations. Do not fix the current whole-item model by changing every quantity to binary Double.
 
 Grams and millilitres cover the owner's stated examples. Final implementation must define the smallest supported increment for each dimension and reject unsupported precision visibly rather than truncate it. Money-based quotes may require a rounded measured quantity; show that result and reconcile the charge explicitly.
 
@@ -43,7 +43,7 @@ Examples at gram/ml precision:
 | 1/2 kg solid cooking fat | 500 g | Weight |
 | 1 3/4 kg beans | 1750 g | Weight |
 
-Store the price together with its pricing quantity, for example KES 160 per 1000 g. For a proportional rate, line amount = rate amount times sold base quantity divided by pricing base quantity. Compute a canonical rounded line amount once; the cart, saved receipt, tender totals, debt and reports must use that same amount. Store money as integer minor units or exact decimal values at the boundary; document and test any compatibility conversion needed for inherited Double fields.
+Store the price together with its pricing quantity, for example KES 160 per 1000 g. For a proportional rate, line amount = rate amount times sold base quantity divided by pricing base quantity. Compute a canonical rounded line amount once; the cart, saved receipt, tender totals, debt and reports must use that same amount. Canonical line amounts are rounded with BigDecimal at two decimal places before compatibility conversion to the inherited Double money columns. Receipts and reporting use those saved line/sale amounts. The quantity columns themselves contain no floating-point fractions.
 
 Allow product-specific portion pricing where the owner charges a distinct price for a named quantity, such as 250 g. Selecting that portion must still deduct 250 g from the same stock pool. Custom-quantity quotes use the stated proportional rate unless an explicit portion/override is selected. Do not silently apply an inconsistent linear price.
 

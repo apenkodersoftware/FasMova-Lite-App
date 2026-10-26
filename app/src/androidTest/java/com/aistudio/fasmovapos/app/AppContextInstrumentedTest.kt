@@ -11,6 +11,6 @@ class AppContextInstrumentedTest {
   @Test
   fun useAppContext() {
     val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-    assertEquals("com.apenkoder.malimali", appContext.packageName)
+    assertEquals("com.apenkoder.fasmovalite", appContext.packageName)
   }
 }

@@ -12,6 +12,7 @@ import com.aistudio.fasmovapos.app.data.db.entities.SalePaymentEntity
 import com.aistudio.fasmovapos.app.data.payment.SPLIT_PAYMENT_CODE
 import com.aistudio.fasmovapos.app.data.payment.formatAmount
 import com.aistudio.fasmovapos.app.data.payment.paymentMethodOf
+import com.aistudio.fasmovapos.app.data.repository.RetailQuantity
 import com.aistudio.fasmovapos.app.ui.language.localizedPersonName
 import com.aistudio.fasmovapos.app.ui.language.localizedProductName
 import java.text.SimpleDateFormat
@@ -69,7 +70,7 @@ fun receiptShareText(
   }
   lines += "-----------------------------"
   items.forEach {
-    lines += "${it.quantity} x ${localizedProductName(
+    lines += "${RetailQuantity.label(it.quantity, it.quantityScale, it.quantityUnit)} x ${localizedProductName(
       context,
       it.productId,
       it.productName,
@@ -79,7 +80,10 @@ fun receiptShareText(
   lines += "${context.getString(R.string.subtotal_2)} KES ${formatAmount(sale.totalAmount)}"
   if (sale.discountAmount > 0) lines += "${context.getString(R.string.discount_3)} - KES ${formatAmount(sale.discountAmount)}"
   if (sale.taxAmount > 0) lines += "${context.getString(R.string.vat_16_incl_2)} KES ${formatAmount(sale.taxAmount)}"
-  lines += "${context.getString(receiptTotalLabel(sale.paymentMethod))} KES ${formatAmount(sale.netAmount)}"
+  lines +=
+    "${context.getString(
+      receiptTotalLabel(sale.paymentMethod, payments.any { it.method == "CREDIT" }),
+    )} KES ${formatAmount(sale.netAmount)}"
   lines += ""
   lines += context.getString(R.string.local_storage_notice)
   lines += context.getString(R.string.thank_you_for_shopping_with_us)
@@ -98,7 +102,17 @@ private fun methodLabel(
 
 /** A credit sale records an amount owed, rather than claiming it has been paid. */
 @StringRes
-internal fun receiptTotalLabel(paymentMethod: String): Int = if (paymentMethod == "CREDIT") R.string.simple_total else R.string.total_paid
+internal fun receiptTotalLabel(
+  paymentMethod: String,
+  hasCredit: Boolean = false,
+): Int =
+  if (paymentMethod == "CREDIT" ||
+    hasCredit
+  ) {
+    R.string.simple_total
+  } else {
+    R.string.total_paid
+  }
 
 /** Opens the system share sheet with [text]. */
 fun shareReceiptText(

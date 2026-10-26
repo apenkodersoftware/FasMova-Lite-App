@@ -77,15 +77,20 @@ fun SimpleChargeScreen(
   actions: ChargeActions,
   modifier: Modifier = Modifier,
 ) {
-  val gross = state.cart.sumOf { it.product.sellingPrice * it.quantity }
+  val gross = state.cart.sumOf { it.lineTotal }
   val total = (gross - state.payment.discountAmount(gross)).coerceAtLeast(0.0)
   val visibleMethod =
-    !state.payment.isSplit && state.payment.method in listOf(PaymentMethod.CASH, PaymentMethod.MPESA, PaymentMethod.CREDIT)
+    if (state.payment.isSplit) {
+      state.payment.splitMethodA in listOf(PaymentMethod.CASH, PaymentMethod.MPESA) &&
+        state.payment.splitMethodB in listOf(PaymentMethod.CASH, PaymentMethod.MPESA, PaymentMethod.CREDIT)
+    } else {
+      state.payment.method in listOf(PaymentMethod.CASH, PaymentMethod.MPESA, PaymentMethod.CREDIT)
+    }
   val issue = state.payment.validationError(total, state.customer != null)
   Column(modifier = modifier.fillMaxSize().imePadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     TextButton(onClick = actions.back, enabled = !state.saving) { Text(stringResource(R.string.simple_back_sell), fontSize = 16.sp) }
     LazyColumn(modifier = Modifier.weight(1f).testTag("simple_charge_list"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-      items(state.cart, key = { it.product.id }) { item ->
+      items(state.cart, key = { it.lineKey }) { item ->
         SimpleCartRow(item, state.saving, actions)
       }
       item {
@@ -100,10 +105,13 @@ fun SimpleChargeScreen(
         )
       }
       item { SimplePaymentChoices(state, actions) }
-      if (state.payment.method == PaymentMethod.MPESA) {
+      if (state.payment.isSplit) {
+        item { LiteSplitFields(state, actions, total) }
+      }
+      if (!state.payment.isSplit && state.payment.method == PaymentMethod.MPESA) {
         item { SimpleMpesaFields(state, actions) }
       }
-      if (state.payment.method == PaymentMethod.CREDIT) {
+      if (state.payment.method == PaymentMethod.CREDIT || (state.payment.isSplit && state.payment.splitMethodB == PaymentMethod.CREDIT)) {
         item { SimpleCustomerPicker(state, actions) }
       }
       item { SimpleDiscount(state, actions) }
@@ -131,26 +139,26 @@ private fun SimpleCartRow(
 ) {
   Column(modifier = Modifier.fillMaxWidth()) {
     Text(productLabel(item.product.id, item.product.name), fontSize = 18.sp, fontWeight = FontWeight.Medium)
-    Text(simpleMoney(item.product.sellingPrice * item.quantity), fontSize = 20.sp)
+    Text(simpleMoney(item.lineTotal), fontSize = 20.sp)
     Row(verticalAlignment = Alignment.CenterVertically) {
       IconButton(onClick = {
-        actions.changeQuantity(item.product.id, -1)
+        actions.changeQuantity(item.lineKey, -if (item.product.quantityScale == 1) 1 else minOf(item.pricingQuantity, 250))
       }, enabled = !saving, modifier = Modifier.testTag("simple_minus_${item.product.id}")) {
         Icon(
           Icons.Default.Remove,
           contentDescription = stringResource(R.string.simple_decrease, productLabel(item.product.id, item.product.name)),
         )
       }
-      Text(item.quantity.toString(), fontSize = 20.sp)
+      Text(item.quantityLabel, fontSize = 20.sp)
       IconButton(onClick = {
-        actions.changeQuantity(item.product.id, 1)
+        actions.changeQuantity(item.lineKey, if (item.product.quantityScale == 1) 1 else minOf(item.pricingQuantity, 250))
       }, enabled = !saving, modifier = Modifier.testTag("simple_plus_${item.product.id}")) {
         Icon(
           Icons.Default.Add,
           contentDescription = stringResource(R.string.simple_increase, productLabel(item.product.id, item.product.name)),
         )
       }
-      TextButton(onClick = { actions.remove(item.product.id) }, enabled = !saving) {
+      TextButton(onClick = { actions.remove(item.lineKey) }, enabled = !saving) {
         Text(stringResource(R.string.simple_remove), fontSize = 16.sp)
       }
     }
@@ -170,6 +178,21 @@ private fun SimplePaymentChoices(
     )
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(stringResource(R.string.simple_pay_by), fontSize = 16.sp)
+    OutlinedButton(
+      onClick = {
+        actions.updatePayment {
+          it.copy(
+            isSplit = true,
+            splitMethodA = PaymentMethod.CASH,
+            splitMethodB = PaymentMethod.CREDIT,
+          )
+        }
+      },
+      enabled = !state.saving,
+      modifier = Modifier.fillMaxWidth().testTag("lite_part_payment"),
+    ) {
+      Text(stringResource(R.string.lite_part_payment))
+    }
     methods.forEach { (method, label) ->
       OutlinedButton(
         onClick = {

@@ -102,10 +102,12 @@ class SimpleChargeTest {
   }
 
   @Test
-  fun inheritedSplitDraftNeedsAnExplicitVisibleMethod() {
+  fun validSplitDraftRemainsVisibleAndCanReturnToCash() {
     payment = PaymentState(isSplit = true, splitAmountA = "50", splitReferenceB = "QKJ9821LXM")
     showCharge()
-    rule.onNodeWithTag("simple_complete_sale").assertIsNotEnabled()
+    rule.onNodeWithTag("simple_charge_list").performScrollToNode(hasTestTag("lite_split_code_b"))
+    rule.onNodeWithTag("lite_split_code_b").assertIsDisplayed()
+    rule.onNodeWithTag("simple_complete_sale").assertIsEnabled()
     rule.onNodeWithTag("simple_charge_list").performScrollToNode(hasTestTag("simple_payment_cash"))
     rule.onNodeWithTag("simple_payment_cash").performClick()
     rule.onNodeWithTag("simple_complete_sale").assertIsEnabled()

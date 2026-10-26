@@ -95,8 +95,12 @@ class PaymentStateTest {
   }
 
   @Test
-  fun creditCannotBeSplit() {
-    assertEquals(false, PaymentMethod.CREDIT.canSplit)
+  fun partPaidCreditRequiresACustomerAndKeepsTheUnpaidLeg() {
+    assertEquals(true, PaymentMethod.CREDIT.canSplit)
+    val state = PaymentState(isSplit = true, splitMethodB = PaymentMethod.CREDIT, splitAmountA = "100")
+    assertNotNull(state.validationError(280.0, hasCustomer = false))
+    assertNull(state.validationError(280.0, hasCustomer = true))
+    assertEquals(180.0, state.lines(280.0).last().amount, 0.0)
     assertEquals(true, PaymentMethod.AIRTEL.canSplit)
   }
 

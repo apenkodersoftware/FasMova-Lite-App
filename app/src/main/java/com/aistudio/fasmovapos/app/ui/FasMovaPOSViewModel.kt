@@ -28,6 +28,7 @@ import com.aistudio.fasmovapos.app.data.payment.PaymentState
 import com.aistudio.fasmovapos.app.data.repository.CartItem
 import com.aistudio.fasmovapos.app.data.repository.FasMovaPOSRepository
 import com.aistudio.fasmovapos.app.data.repository.HQ_BRANCH_ID
+import com.aistudio.fasmovapos.app.data.repository.ProductMeasure
 import com.aistudio.fasmovapos.app.data.security.PinProblem
 import com.aistudio.fasmovapos.app.ui.components.roleLabelRes
 import com.aistudio.fasmovapos.app.ui.components.text
@@ -270,7 +271,7 @@ class FasMovaPOSViewModel(
   /** Discount in KES, derived so a percentage discount follows the cart as items change. */
   val cartDiscount: StateFlow<Double> =
     combine(_cart, _paymentState) { cart, payment ->
-      payment.discountAmount(cart.sumOf { it.product.sellingPrice * it.quantity })
+      payment.discountAmount(cart.sumOf { it.lineTotal })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
   private val _selectedCustomer = MutableStateFlow<CustomerEntity?>(null)
@@ -279,7 +280,7 @@ class FasMovaPOSViewModel(
   private val _posSearchQuery = MutableStateFlow("")
   val posSearchQuery: StateFlow<String> = _posSearchQuery.asStateFlow()
 
-  private val _posCategoryFilter = MutableStateFlow("All")
+  private val _posCategoryFilter = MutableStateFlow("__FAVOURITES__")
   val posCategoryFilter: StateFlow<String> = _posCategoryFilter.asStateFlow()
 
   // Receipt Modal State
@@ -333,48 +334,46 @@ class FasMovaPOSViewModel(
     _posCategoryFilter.value = category
   }
 
-  fun addToCart(product: ProductEntity) {
-    if (product.stockQuantity <= 0) {
-      showToast(str(R.string.item_out_of_stock))
+  fun addToCart(product: ProductEntity) = addMeasuredToCart(CartItem(product, product.quantityScale))
+
+  fun addMeasuredToCart(item: CartItem) {
+    val held = _cart.value.filter { it.product.id == item.product.id }.sumOf { it.quantity.toLong() }
+    if (item.quantity <= 0 || held + item.quantity > item.product.stockQuantity || item.lineTotal <= 0) {
+      showToast(str(R.string.maximum_available_stock_reached))
       return
     }
-    val currentList = _cart.value.toMutableList()
-    val index = currentList.indexOfFirst { it.product.id == product.id }
-    if (index >= 0) {
-      val existing = currentList[index]
-      if (existing.quantity < product.stockQuantity) {
-        currentList[index] = existing.copy(quantity = existing.quantity + 1)
-      } else {
-        showToast(str(R.string.maximum_available_stock_reached))
-      }
+    val current = _cart.value.toMutableList()
+    val index = current.indexOfFirst { it.lineKey == item.lineKey }
+    if (index <
+      0
+    ) {
+      current.add(item)
     } else {
-      currentList.add(CartItem(product = product, quantity = 1))
+      current[index] = current[index].copy(quantity = Math.addExact(current[index].quantity, item.quantity))
     }
-    _cart.value = currentList
+    _cart.value = current
   }
 
   fun updateCartQuantity(
     productId: String,
     delta: Int,
   ) {
-    val currentList = _cart.value.toMutableList()
-    val index = currentList.indexOfFirst { it.product.id == productId }
-    if (index >= 0) {
-      val existing = currentList[index]
-      val newQty = existing.quantity + delta
-      if (newQty <= 0) {
-        currentList.removeAt(index)
-      } else if (newQty <= existing.product.stockQuantity) {
-        currentList[index] = existing.copy(quantity = newQty)
-      } else {
-        showToast(str(R.string.stock_limit_reached_available, existing.product.stockQuantity))
-      }
+    val current = _cart.value.toMutableList()
+    val index = current.indexOfFirst { it.lineKey == productId || it.product.id == productId }
+    if (index < 0) return
+    val item = current[index]
+    val next = item.quantity.toLong() + delta
+    val other = current.filterIndexed { i, line -> i != index && line.product.id == item.product.id }.sumOf { it.quantity.toLong() }
+    when {
+      next <= 0 -> current.removeAt(index)
+      next + other > item.product.stockQuantity -> showToast(str(R.string.maximum_available_stock_reached))
+      else -> current[index] = item.copy(quantity = next.toInt())
     }
-    _cart.value = currentList
+    _cart.value = current
   }
 
   fun removeFromCart(productId: String) {
-    _cart.value = _cart.value.filter { it.product.id != productId }
+    _cart.value = _cart.value.filter { it.lineKey != productId && it.product.id != productId }
   }
 
   fun clearCart() {
@@ -414,7 +413,7 @@ class FasMovaPOSViewModel(
     }
     val cust = _selectedCustomer.value
     val payment = _paymentState.value
-    val gross = currentCart.sumOf { it.product.sellingPrice * it.quantity }
+    val gross = currentCart.sumOf { it.lineTotal }
     val discount = payment.discountAmount(gross)
     val net = (gross - discount).coerceAtLeast(0.0)
 
@@ -477,6 +476,18 @@ class FasMovaPOSViewModel(
     sellingPrice: Double,
     stockQty: Int,
     minThreshold: Int,
+  ) = addMeasuredProduct(sku, name, category, costPrice, sellingPrice, stockQty, minThreshold, ProductMeasure(unit = unit), barcode)
+
+  fun addMeasuredProduct(
+    sku: String,
+    name: String,
+    category: String,
+    costPrice: Double,
+    sellingPrice: Double,
+    stockQty: Int,
+    minThreshold: Int,
+    measure: ProductMeasure,
+    barcode: String = "",
   ) {
     launchWrite {
       val p =
@@ -486,11 +497,15 @@ class FasMovaPOSViewModel(
           barcode = barcode.ifBlank { System.currentTimeMillis().toString() },
           name = name,
           category = category,
-          unit = unit,
+          unit = measure.unit,
           costPrice = costPrice,
           sellingPrice = sellingPrice,
           stockQuantity = stockQty,
           minStockThreshold = minThreshold,
+          quantityScale = measure.scale,
+          quarterPrice = measure.quarterPrice,
+          halfPrice = measure.halfPrice,
+          isFavorite = products.value.count { it.isFavorite } < 12,
           branchId = _currentBranch.value.id,
         )
       repository.saveProduct(p)
@@ -498,14 +513,21 @@ class FasMovaPOSViewModel(
     }
   }
 
+  fun setFavorite(
+    productId: String,
+    favorite: Boolean,
+  ) = launchWrite { repository.setFavorite(productId, favorite) }
+
   fun adjustStock(
     productId: String,
     changeQty: Int,
     costPrice: Double? = null,
     sellingPrice: Double? = null,
+    quarterPrice: Double? = null,
+    halfPrice: Double? = null,
   ) {
     launchWrite {
-      repository.adjustProductStock(productId, changeQty, costPrice, sellingPrice)
+      repository.adjustProductStock(productId, changeQty, costPrice, sellingPrice, quarterPrice, halfPrice)
       showToast(str(R.string.stock_updated))
     }
   }

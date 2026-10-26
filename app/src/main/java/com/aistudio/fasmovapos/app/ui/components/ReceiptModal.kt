@@ -44,6 +44,7 @@ import com.aistudio.fasmovapos.app.data.db.entities.SaleEntity
 import com.aistudio.fasmovapos.app.data.db.entities.SaleItemEntity
 import com.aistudio.fasmovapos.app.data.db.entities.SalePaymentEntity
 import com.aistudio.fasmovapos.app.data.payment.formatAmount
+import com.aistudio.fasmovapos.app.data.repository.RetailQuantity
 import com.aistudio.fasmovapos.app.ui.language.personLabel
 import com.aistudio.fasmovapos.app.ui.language.productLabel
 import com.aistudio.fasmovapos.app.ui.theme.ProfessionalPrimary
@@ -177,12 +178,17 @@ fun ReceiptModal(
               items.forEach { item ->
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                   Text(
-                    "${item.quantity}x ${productLabel(item.productId, item.productName)}",
+                    "${RetailQuantity.label(
+                      item.quantity,
+                      item.quantityScale,
+                      item.quantityUnit,
+                    )} ${productLabel(item.productId, item.productName)}",
                     modifier = Modifier.weight(2f),
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                   )
                   Text(
-                    String.format("%.0f", item.unitPrice),
+                    String.format(java.util.Locale.ROOT, "%.2f", item.unitPrice) + " / " +
+                      RetailQuantity.label(item.pricingQuantity, item.quantityScale, item.quantityUnit),
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.End,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -212,7 +218,7 @@ fun ReceiptModal(
 
               Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                  stringResource(receiptTotalLabel(sale.paymentMethod)),
+                  stringResource(receiptTotalLabel(sale.paymentMethod, payments.any { it.method == "CREDIT" })),
                   modifier = Modifier.weight(1f),
                   style =
                     MaterialTheme.typography.titleSmall.copy(

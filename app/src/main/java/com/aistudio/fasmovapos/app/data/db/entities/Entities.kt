@@ -20,6 +20,10 @@ data class ProductEntity(
   val branchId: String,
   val isSynced: Boolean = false,
   val updatedAt: Long = System.currentTimeMillis(),
+  @ColumnInfo(defaultValue = "1") val quantityScale: Int = 1,
+  @ColumnInfo(defaultValue = "0") val quarterPrice: Double = 0.0,
+  @ColumnInfo(defaultValue = "0") val halfPrice: Double = 0.0,
+  @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
 )
 
 @Entity(tableName = "sales")
@@ -50,6 +54,9 @@ data class SaleItemEntity(
   val quantity: Int,
   val unitPrice: Double,
   val totalPrice: Double,
+  @ColumnInfo(defaultValue = "1") val quantityScale: Int = 1,
+  @ColumnInfo(defaultValue = "'Pcs'") val quantityUnit: String = "Pcs",
+  @ColumnInfo(defaultValue = "1") val pricingQuantity: Int = 1,
 )
 
 /** One payment leg of a sale. Sales made before split payments existed have no rows here. */

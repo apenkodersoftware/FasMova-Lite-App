@@ -149,11 +149,11 @@ class FasMovaPOSRepository(
     db.withTransaction {
       validateCart(branchId, cartItems)
       val saleId = UUID.randomUUID().toString()
-      val txRef = "MM-" + saleId.uppercase()
+      val txRef = "FL-" + saleId.uppercase()
       val gross =
         cartItems.fold(BigDecimal.ZERO) { sum, item ->
           sum +
-            retailAmount(item.product.sellingPrice) * item.quantity.toBigDecimal()
+            retailAmount(item.lineTotal)
         }
       val discount = retailAmount(discountAmount)
       require(discount <= gross) { "Discount cannot exceed the sale total" }
@@ -209,8 +209,11 @@ class FasMovaPOSRepository(
             productId = item.product.id,
             productName = item.product.name,
             quantity = item.quantity,
-            unitPrice = item.product.sellingPrice,
-            totalPrice = item.product.sellingPrice * item.quantity,
+            unitPrice = item.pricingPrice,
+            totalPrice = item.lineTotal,
+            quantityScale = item.product.quantityScale,
+            quantityUnit = item.product.unit,
+            pricingQuantity = item.pricingQuantity,
           )
         }
 
@@ -266,6 +269,21 @@ class FasMovaPOSRepository(
       require(lines.all { retailAmount(it.product.sellingPrice).compareTo(retailAmount(stored.sellingPrice)) == 0 }) {
         "Price changed for " + stored.name + ". Remove it from the cart and add it again."
       }
+      require(lines.all { it.product.quantityScale == stored.quantityScale && it.product.unit == stored.unit }) {
+        "Product unit changed. Remove it from the sale and add it again."
+      }
+      lines.forEach { line ->
+        val expectedPrice =
+          when (line.pricingQuantity) {
+            stored.quantityScale -> stored.sellingPrice
+            250 -> stored.quarterPrice.takeIf { stored.quantityScale == 1000 && it > 0 }
+            500 -> stored.halfPrice.takeIf { stored.quantityScale == 1000 && it > 0 }
+            else -> null
+          }
+        require(expectedPrice != null && retailAmount(line.pricingPrice) == retailAmount(expectedPrice)) {
+          "Portion price changed. Remove it from the sale and add it again."
+        }
+      }
     }
   }
 
@@ -274,7 +292,9 @@ class FasMovaPOSRepository(
     require(mobileCodes.all { isValidMobileCode(it) }) { "Enter the mobile-money reference from the payment message" }
     require(mobileCodes.distinct().size == mobileCodes.size) { "A mobile-money reference can only be used once" }
     for (code in mobileCodes) {
-      require(db.saleDao().countUsesOfReference(code) == 0) { "Mobile-money reference already recorded" }
+      require(db.saleDao().countUsesOfReference(code) == 0 && db.customerDao().countMobileReference(code) == 0) {
+        "Mobile-money reference already recorded"
+      }
     }
     return lines.map {
       it.copy(reference = if (it.method.isMobileMoney) normalizeMobileCode(it.reference) else newPaymentReference(it.method))
@@ -305,6 +325,15 @@ class FasMovaPOSRepository(
         "Enter the product name, category and unit"
       }
       require(product.stockQuantity >= 0 && product.minStockThreshold >= 0) { "Stock and thresholds cannot be negative" }
+      require(
+        product.quantityScale == 1 || (product.quantityScale == 1000 && product.unit in listOf("Kg", "Ltr")),
+      ) { "Invalid product measure" }
+      retailAmount(product.quarterPrice)
+      retailAmount(product.halfPrice)
+      val old = db.productDao().getProductById(product.id)
+      require(old == null || (old.quantityScale == product.quantityScale && old.unit == product.unit)) {
+        "Create a new product to change its unit"
+      }
       retailAmount(product.costPrice)
       require(retailAmount(product.sellingPrice).signum() > 0) { "Selling price must be positive" }
       db.productDao().insertProduct(product)
@@ -318,15 +347,27 @@ class FasMovaPOSRepository(
       )
     }
 
+  suspend fun setFavorite(
+    productId: String,
+    favorite: Boolean,
+  ) = db.withTransaction {
+    val product = requireNotNull(db.productDao().getProductById(productId))
+    db.productDao().updateProduct(product.copy(isFavorite = favorite))
+  }
+
   suspend fun adjustProductStock(
     productId: String,
     changeAmount: Int,
     costPrice: Double?,
     sellingPrice: Double?,
+    quarterPrice: Double? = null,
+    halfPrice: Double? = null,
   ) = db.withTransaction {
     val existing = requireNotNull(db.productDao().getProductById(productId)) { "Product no longer exists" }
     val newStock = existing.stockQuantity.toLong() + changeAmount
     require(newStock in 0..Int.MAX_VALUE.toLong()) { "Adjustment would put stock outside the valid range" }
+    quarterPrice?.let { retailAmount(it) }
+    halfPrice?.let { retailAmount(it) }
     costPrice?.let { retailAmount(it) }
     sellingPrice?.let { require(retailAmount(it).signum() > 0) { "Selling price must be positive" } }
     val updated =
@@ -334,6 +375,8 @@ class FasMovaPOSRepository(
         stockQuantity = newStock.toInt(),
         costPrice = costPrice ?: existing.costPrice,
         sellingPrice = sellingPrice ?: existing.sellingPrice,
+        quarterPrice = quarterPrice ?: existing.quarterPrice,
+        halfPrice = halfPrice ?: existing.halfPrice,
         updatedAt = System.currentTimeMillis(),
       )
     db.productDao().updateProduct(updated)
@@ -348,7 +391,8 @@ class FasMovaPOSRepository(
   }
 
   suspend fun addExpense(expense: ExpenseEntity) =
-    withContext(Dispatchers.IO) {
+    db.withTransaction {
+      require(expense.category.isNotBlank() && retailAmount(expense.amount).signum() > 0) { "Enter a valid expense" }
       db.expenseDao().insertExpense(expense)
       db.syncQueueDao().enqueue(
         SyncQueueEntity(
@@ -361,7 +405,10 @@ class FasMovaPOSRepository(
     }
 
   suspend fun addCustomer(customer: CustomerEntity) =
-    withContext(Dispatchers.IO) {
+    db.withTransaction {
+      require(customer.name.isNotBlank()) { "Enter the customer name" }
+      retailAmount(customer.creditLimit)
+      retailAmount(customer.currentDebt)
       db.customerDao().insertCustomer(customer)
       db.syncQueueDao().enqueue(
         SyncQueueEntity(
@@ -380,7 +427,19 @@ class FasMovaPOSRepository(
       require(amount.signum() > 0) { "Repayment must be positive" }
       require(amount <= retailAmount(customer.currentDebt)) { "Repayment exceeds the outstanding debt" }
       require(db.customerDao().getPaymentById(payment.id) == null) { "Repayment already recorded" }
-      db.customerDao().insertPayment(payment)
+      require(payment.paymentMethod in listOf("CASH", "MPESA", "AIRTEL", "BANK")) { "Choose a payment method" }
+      val reference =
+        if (payment.paymentMethod in listOf("MPESA", "AIRTEL")) {
+          val code = normalizeMobileCode(payment.reference)
+          require(isValidMobileCode(code)) { "Enter the payment reference" }
+          require(db.saleDao().countUsesOfReference(code) == 0 && db.customerDao().countMobileReference(code) == 0) {
+            "Payment reference already recorded"
+          }
+          code
+        } else {
+          payment.reference
+        }
+      db.customerDao().insertPayment(payment.copy(reference = reference, customerName = customer.name))
       val newDebt = (retailAmount(customer.currentDebt) - amount).toDouble()
       db.customerDao().updateCustomer(customer.copy(currentDebt = newDebt))
       db.syncQueueDao().enqueue(
@@ -503,7 +562,11 @@ class FasMovaPOSRepository(
     }
 
   /** True if a mobile-money confirmation code has already paid for a sale, so one SMS cannot pay twice. */
-  suspend fun isMobileMoneyCodeUsed(code: String): Boolean = withContext(Dispatchers.IO) { db.saleDao().countUsesOfReference(code) > 0 }
+  suspend fun isMobileMoneyCodeUsed(code: String): Boolean =
+    withContext(Dispatchers.IO) {
+      db.saleDao().countUsesOfReference(code) > 0 ||
+        db.customerDao().countMobileReference(code) > 0
+    }
 
   suspend fun getSalePayments(saleId: String): List<SalePaymentEntity> =
     withContext(Dispatchers.IO) { db.saleDao().getSalePayments(saleId) }
@@ -533,4 +596,10 @@ class FasMovaPOSRepository(
 data class CartItem(
   val product: ProductEntity,
   var quantity: Int,
-)
+  val pricingQuantity: Int = product.quantityScale,
+  val pricingPrice: Double = product.sellingPrice,
+) {
+  val lineKey: String get() = "${product.id}:$pricingQuantity:$pricingPrice"
+  val lineTotal: Double get() = RetailQuantity.amount(pricingPrice, quantity, pricingQuantity)
+  val quantityLabel: String get() = RetailQuantity.label(quantity, product.quantityScale, product.unit)
+}

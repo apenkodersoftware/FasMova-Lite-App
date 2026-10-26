@@ -42,8 +42,13 @@ import androidx.compose.ui.window.DialogProperties
 import com.aistudio.fasmovapos.app.R
 import com.aistudio.fasmovapos.app.data.db.entities.CustomerEntity
 import com.aistudio.fasmovapos.app.data.db.entities.CustomerPaymentEntity
+import com.aistudio.fasmovapos.app.data.payment.isValidMobileCode
 import com.aistudio.fasmovapos.app.ui.components.paymentCodeLabel
 import com.aistudio.fasmovapos.app.ui.language.personLabel
+import com.aistudio.fasmovapos.app.ui.simple.DebtHistoryDialog
+import com.aistudio.fasmovapos.app.ui.simple.DebtHistoryState
+import com.aistudio.fasmovapos.app.ui.simple.DebtRecords
+import com.aistudio.fasmovapos.app.ui.simple.debtHistory
 
 @Composable
 fun CustomersScreen(
@@ -51,7 +56,9 @@ fun CustomersScreen(
   payments: List<CustomerPaymentEntity>,
   onAddCustomer: (String, String, String, Double) -> Unit,
   onRecordPayment: (CustomerEntity, Double, String, String) -> Unit,
+  records: DebtRecords = DebtRecords(),
 ) {
+  var historyId by remember { mutableStateOf<String?>(null) }
   var showAddCustomerDialog by remember { mutableStateOf(false) }
   var selectedPaymentCustomer by remember { mutableStateOf<CustomerEntity?>(null) }
 
@@ -109,7 +116,7 @@ fun CustomersScreen(
       )
     }
     items(customers, key = { "customer:${it.id}" }) { cust ->
-      CustomerRow(customer = cust, onPayDebt = { selectedPaymentCustomer = cust })
+      CustomerRow(customer = cust, onPayDebt = { selectedPaymentCustomer = cust }, onHistory = { historyId = cust.id })
     }
     item {
       Spacer(modifier = Modifier.height(8.dp))
@@ -122,6 +129,10 @@ fun CustomersScreen(
     items(payments, key = { "payment:${it.id}" }) { p ->
       PaymentRow(payment = p)
     }
+  }
+
+  customers.firstOrNull { it.id == historyId }?.let { customer ->
+    DebtHistoryDialog(customer, DebtHistoryState(debtHistory(customer.id, records.sales, records.payments, payments))) { historyId = null }
   }
 
   if (showAddCustomerDialog) {
@@ -150,6 +161,7 @@ fun CustomersScreen(
 private fun CustomerRow(
   customer: CustomerEntity,
   onPayDebt: () -> Unit,
+  onHistory: () -> Unit,
 ) {
   Surface(
     shape = RoundedCornerShape(12.dp),
@@ -191,6 +203,9 @@ private fun CustomerRow(
           style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
           color = if (customer.currentDebt > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
+        TextButton(onClick = onHistory, modifier = Modifier.fillMaxWidth().testTag("lite_history_${customer.id}")) {
+          Text(stringResource(R.string.lite_statement))
+        }
         if (customer.currentDebt > 0) {
           Button(
             onClick = onPayDebt,
@@ -281,7 +296,7 @@ private fun AddCustomerDialog(
           phone = it
         }, label = {
           Text(
-            stringResource(R.string.phone_number),
+            stringResource(R.string.simple_phone_optional),
             modifier = Modifier.fillMaxWidth(),
           )
         }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("customer_phone"))
@@ -313,10 +328,18 @@ private fun AddCustomerDialog(
           Spacer(modifier = Modifier.height(8.dp))
           Button(
             onClick = {
-              if (name.isNotBlank() && phone.isNotBlank()) {
-                onConfirm(name, phone, email, creditLimitStr.toDoubleOrNull() ?: 50000.0)
+              if (name.isNotBlank()) {
+                onConfirm(name.trim(), phone.trim(), email.trim(), creditLimitStr.toDouble())
               }
             },
+            enabled =
+              name.isNotBlank() &&
+                creditLimitStr.toBigDecimalOrNull()?.let {
+                  it.signum() >= 0 &&
+                    it.stripTrailingZeros().scale() <= 2 &&
+                    it.toDouble().isFinite()
+                } ==
+                true,
             modifier = Modifier.fillMaxWidth().testTag("confirm_customer_button"),
           ) {
             Text(stringResource(R.string.save_account), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
@@ -334,7 +357,7 @@ private fun RecordPaymentDialog(
   onConfirm: (Double, String, String) -> Unit,
 ) {
   var amountStr by remember { mutableStateOf(customer.currentDebt.toString()) }
-  var method by remember { mutableStateOf("MPESA") }
+  var method by remember { mutableStateOf("CASH") }
   var reference by remember { mutableStateOf("") }
 
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -362,7 +385,7 @@ private fun RecordPaymentDialog(
           label = { Text(stringResource(R.string.amount_paid_kes), modifier = Modifier.fillMaxWidth()) },
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
           singleLine = true,
-          modifier = Modifier.fillMaxWidth(),
+          modifier = Modifier.fillMaxWidth().testTag("lite_repayment_amount"),
         )
 
         OutlinedTextField(
@@ -389,10 +412,20 @@ private fun RecordPaymentDialog(
           Button(
             onClick = {
               val amt = amountStr.toDoubleOrNull() ?: 0.0
-              if (amt > 0) {
-                onConfirm(amt, method, reference)
+              if (amt > 0 && amt <= customer.currentDebt) {
+                onConfirm(amt, method.uppercase().trim(), reference)
               }
             },
+            enabled =
+              amountStr.toBigDecimalOrNull()?.let {
+                it.signum() > 0 &&
+                  it.stripTrailingZeros().scale() <= 2 &&
+                  it.toDouble() <= customer.currentDebt
+              } ==
+                true &&
+                method.uppercase().trim() in listOf("CASH", "MPESA", "BANK") &&
+                (method.uppercase().trim() != "MPESA" || isValidMobileCode(reference)),
+            modifier = Modifier.testTag("lite_save_repayment"),
           ) {
             Text(stringResource(R.string.record_payment), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
           }

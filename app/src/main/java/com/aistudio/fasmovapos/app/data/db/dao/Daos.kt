@@ -163,6 +163,9 @@ interface CustomerDao {
   @Query("SELECT * FROM customer_payments WHERE id = :id LIMIT 1")
   suspend fun getPaymentById(id: String): CustomerPaymentEntity?
 
+  @Query("SELECT COUNT(*) FROM customer_payments WHERE paymentMethod IN ('MPESA','AIRTEL') AND reference = :reference")
+  suspend fun countMobileReference(reference: String): Int
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun insertPayment(payment: CustomerPaymentEntity)
 

@@ -339,7 +339,7 @@ private fun CartPanel(
   isCheckingOut: Boolean,
   modifier: Modifier = Modifier,
 ) {
-  val grossTotal = cart.sumOf { it.product.sellingPrice * it.quantity }
+  val grossTotal = cart.sumOf { it.lineTotal }
   val netTotal = (grossTotal - discount).coerceAtLeast(0.0)
 
   Surface(
@@ -747,7 +747,7 @@ private fun CartItemRow(
       Spacer(modifier = Modifier.width(6.dp))
 
       Text(
-        text = "KES ${String.format("%.0f", item.product.sellingPrice * item.quantity)}",
+        text = "KES ${String.format(java.util.Locale.ROOT, "%.2f", item.lineTotal)}",
         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
         color = MaterialTheme.colorScheme.primary,
       )

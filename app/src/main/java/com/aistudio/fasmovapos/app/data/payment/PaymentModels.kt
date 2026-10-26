@@ -20,8 +20,8 @@ enum class PaymentMethod(
 
   val isMobileMoney: Boolean get() = this == MPESA || this == AIRTEL
 
-  /** Credit records a debt, not a payment, so it can't be one half of a split. */
-  val canSplit: Boolean get() = this != CREDIT
+  /** A credit leg records the unpaid balance of a part-paid sale. */
+  val canSplit: Boolean get() = true
 }
 
 /** One leg of a sale's payment. A normal sale has one line; a split sale has two. */
@@ -98,7 +98,11 @@ data class PaymentState(
     hasCustomer: Boolean,
   ): PaymentIssue? =
     if (isSplit) {
-      splitError(net)
+      splitError(net) ?: if ((splitMethodA == PaymentMethod.CREDIT || splitMethodB == PaymentMethod.CREDIT) && !hasCustomer) {
+        PaymentIssue(PaymentIssueType.CREDIT_NEEDS_CUSTOMER)
+      } else {
+        null
+      }
     } else {
       singleError(method, reference, hasCustomer)
     }
@@ -115,10 +119,15 @@ data class PaymentState(
     }
 
   private fun splitError(net: Double): PaymentIssue? {
+    val entered = splitAmountA.toBigDecimalOrNull()
     val a = splitAmountA.toDoubleOrNull() ?: 0.0
     return when {
       splitMethodA == splitMethodB -> PaymentIssue(PaymentIssueType.SAME_METHOD)
-      a <= 0.0 -> PaymentIssue(PaymentIssueType.AMOUNT_REQUIRED, splitMethodA)
+      entered == null || !a.isFinite() || entered.stripTrailingZeros().scale() > 2 || a <= 0.0 ->
+        PaymentIssue(
+          PaymentIssueType.AMOUNT_REQUIRED,
+          splitMethodA,
+        )
       a >= net || abs(net - a) < MONEY_EPSILON -> PaymentIssue(PaymentIssueType.AMOUNT_TOO_LARGE, splitMethodA)
       splitMethodA.isMobileMoney && !isValidMobileCode(splitReferenceA) -> PaymentIssue(PaymentIssueType.CODE_REQUIRED, splitMethodA)
       splitMethodB.isMobileMoney && !isValidMobileCode(splitReferenceB) -> PaymentIssue(PaymentIssueType.CODE_REQUIRED, splitMethodB)
@@ -126,7 +135,7 @@ data class PaymentState(
     }
   }
 
-  // The customer's number is optional: it is a convenience on the receipt, the SMS code is what proves payment.
+  // The customer's number is optional: it is a convenience on the receipt, the reference is recorded manually and does not verify payment.
   private fun phoneFor(
     method: PaymentMethod,
     phone: String,

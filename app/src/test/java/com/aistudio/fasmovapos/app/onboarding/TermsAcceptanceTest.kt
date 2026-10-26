@@ -29,7 +29,7 @@ import java.io.File
 class TermsAcceptanceTest {
   @get:Rule val folder = TemporaryFolder()
   private val legacy = booleanPreferencesKey("has_accepted_terms")
-  private val revision = intPreferencesKey("accepted_malimali_terms_revision")
+  private val revision = intPreferencesKey("accepted_fasmovalite_terms_revision")
 
   @Test
   fun priorAcceptanceRequiresExplicitAcceptanceOfTheCorrectedDocument() =

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.fasmovapos.app.R
 import com.aistudio.fasmovapos.app.data.db.entities.ProductEntity
+import com.aistudio.fasmovapos.app.data.repository.RetailQuantity
 import com.aistudio.fasmovapos.app.ui.language.categoryKey
 import com.aistudio.fasmovapos.app.ui.language.categoryLabel
 import com.aistudio.fasmovapos.app.ui.language.localizedProductName
@@ -70,7 +71,7 @@ fun SimpleCatalog(
   val searchQuery = state.searchQuery
   val categoryFilter = categoryKey(state.categoryFilter)
   val categories =
-    listOf("All") +
+    listOf("__FAVOURITES__", "All") +
       products
         .map { categoryKey(it.category) }
         .filter { it.isNotBlank() && it != "All" }
@@ -79,7 +80,11 @@ fun SimpleCatalog(
   val activeCategory = categoryFilter.takeIf { it in categories } ?: "All"
   val visible =
     products.filter { product ->
-      (activeCategory == "All" || categoryKey(product.category) == activeCategory) &&
+      (
+        activeCategory == "All" ||
+          (activeCategory == "__FAVOURITES__" && product.isFavorite) ||
+          categoryKey(product.category) == activeCategory
+      ) &&
         listOf(product.name, localizedProductName(context, product.id, product.name), product.sku, product.barcode).any {
           it.contains(searchQuery, ignoreCase = true)
         }
@@ -98,7 +103,16 @@ fun SimpleCatalog(
         FilterChip(
           selected = activeCategory == category,
           onClick = { onCategoryChange(category) },
-          label = { Text(if (category == "All") stringResource(R.string.simple_all) else categoryLabel(category), fontSize = 16.sp) },
+          label = {
+            Text(
+              when (category) {
+                "All" -> stringResource(R.string.simple_all)
+                "__FAVOURITES__" -> stringResource(R.string.lite_favourites)
+                else -> categoryLabel(category)
+              },
+              fontSize = 16.sp,
+            )
+          },
           modifier = Modifier.heightIn(min = 48.dp),
         )
       }
@@ -163,8 +177,13 @@ private fun SimpleProductCard(
         lineHeight = 30.sp,
         fontWeight = FontWeight.Bold,
       )
+      if (product.quantityScale != 1) Text("/ " + product.unit, fontSize = 16.sp)
       Text(
-        pluralStringResource(R.plurals.simple_stock_left, product.stockQuantity, product.stockQuantity),
+        if (product.quantityScale == 1) {
+          pluralStringResource(R.plurals.simple_stock_left, product.stockQuantity, product.stockQuantity)
+        } else {
+          RetailQuantity.label(product.stockQuantity, product.quantityScale, product.unit)
+        },
         modifier = Modifier.fillMaxWidth(),
         fontSize = 16.sp,
         lineHeight = 24.sp,

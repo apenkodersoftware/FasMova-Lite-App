@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.fasmovapos.app.R
+import com.aistudio.fasmovapos.app.data.db.entities.ProductEntity
 import com.aistudio.fasmovapos.app.ui.FasMovaPOSViewModel
 
 @Composable
@@ -45,6 +46,7 @@ fun SimpleSellScreen(
   val saving by viewModel.isCheckingOut.collectAsStateWithLifecycle()
   val query by viewModel.posSearchQuery.collectAsStateWithLifecycle()
   val category by viewModel.posCategoryFilter.collectAsStateWithLifecycle()
+  var measured by remember { mutableStateOf<ProductEntity?>(null) }
   var reviewing by rememberSaveable { mutableStateOf(false) }
   LaunchedEffect(cart.isEmpty()) {
     if (cart.isEmpty()) {
@@ -75,19 +77,30 @@ fun SimpleSellScreen(
         state = catalogState,
         onSearchChange = viewModel::setPosSearch,
         onCategoryChange = viewModel::setPosCategory,
-        onAddToCart = viewModel::addToCart,
+        onAddToCart = { if (it.quantityScale == 1) viewModel.addToCart(it) else measured = it },
         onOpenStock = onOpenStock,
         modifier = Modifier.weight(1f),
       )
       if (cart.isNotEmpty()) {
-        val gross = cart.sumOf { it.product.sellingPrice * it.quantity }
+        val gross = cart.sumOf { it.lineTotal }
         SimpleCartBar(
-          itemCount = cart.sumOf { it.quantity },
+          itemCount = cart.size,
           total = (gross - payment.discountAmount(gross)).coerceAtLeast(0.0),
           onCharge = { reviewing = true },
         )
       }
     }
+  }
+  measured?.let { product ->
+    QuantityDialog(
+      product = product,
+      held = cart.filter { it.product.id == product.id }.sumOf { it.quantity.toLong() },
+      onDismiss = { measured = null },
+      onAdd = {
+        viewModel.addMeasuredToCart(it)
+        measured = null
+      },
+    )
   }
 }
 
