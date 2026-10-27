@@ -1,12 +1,12 @@
 # FasMova Lite: source assessment and proposed first delivery
 
-Assessed locally on 26 October 2026. This is a feasibility and scope assessment; no application was cloned, changed, built or installed during this assessment.
+Historical feasibility assessment from 26 October 2026, written before implementation. A separate FasMova Lite application has since been built and passed local quality, unit and lint checks. See README.md and the matching GitHub review release for current results. Candidate comparisons below describe the initial inspection.
 
 ## Recommendation
 
 Create FasMova Lite as a separate application from the current MaliMali publication source snapshot. That source already adapts FasMova POS and contains the simplified workflow, transaction hardening, English/Kiswahili resources and layout corrections completed for MaliMali. Reusing it avoids repeating those changes on the original FasMova checkout.
 
-Keep the first delivery to a single shop on one device. Fractional weight and volume sales are mandatory in the first build, alongside piece and fixed-pack sales. The owner explicitly confirmed that loose quantities are fundamental to the target shops. See `FASMOVA-LITE-QUANTITIES.md` for the revised quantity model and acceptance cases.
+Keep the first delivery to a single shop on one device. Fractional weight and volume sales are mandatory in the first build, alongside piece and fixed-pack sales. The owner explicitly confirmed that loose quantities are fundamental to the target shops. See `QUANTITIES.md` for the revised quantity model and acceptance cases.
 
 ## Local evidence
 

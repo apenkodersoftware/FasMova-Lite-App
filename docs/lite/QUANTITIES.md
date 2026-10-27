@@ -1,6 +1,6 @@
 # FasMova Lite: required loose-goods sales
 
-26 October 2026. Confirmed product requirement, with a proposed implementation design. The candidate Android implementation is in work/fasmova-lite; complete build and emulator verification are in progress. No green APK is claimed by this note.
+Mandatory fractional-sale requirements, implemented in the 0.1.0 debug review build. This document also records the original design constraints. Local build checks pass; the matching GitHub review release carries the final device-acceptance report and screenshots.
 
 ## Product decision
 
