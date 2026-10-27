@@ -2,9 +2,11 @@ package com.aistudio.fasmovapos.app
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,6 +20,8 @@ import com.aistudio.fasmovapos.app.data.db.FasMovaPOSDatabase
 import com.aistudio.fasmovapos.app.data.repository.FasMovaPOSRepository
 import com.aistudio.fasmovapos.app.ui.language.AppLanguage
 import com.aistudio.fasmovapos.app.ui.language.LanguageSettings
+import com.aistudio.fasmovapos.app.ui.theme.ThemeMode
+import com.aistudio.fasmovapos.app.ui.theme.ThemePreferences
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -52,6 +56,19 @@ class LiteLargeTextAcceptanceTest {
     }
   }
 
+  private fun waitForTheme(light: Boolean) =
+    rule.waitUntil(30_000) {
+      val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+      if (bitmap == null) {
+        false
+      } else {
+        val color = bitmap.getPixel(4, bitmap.height / 4)
+        bitmap.recycle()
+        val bright = Color.red(color) > 180 && Color.green(color) > 180 && Color.blue(color) > 180
+        bright == light
+      }
+    }
+
   @Test
   fun quantityCustomerAndReportsRemainUsableWithLargeTextAndKeyboard() {
     val original =
@@ -76,7 +93,7 @@ class LiteLargeTextAcceptanceTest {
     val scenario = ActivityScenario.launch(MainActivity::class.java)
     waitFor("simple_nav_pos")
     rule.onNodeWithTag("simple_nav_inventory").performClick()
-    rule.onNodeWithText("Beans").performScrollTo().performClick()
+    rule.onNodeWithText("Beans", useUnmergedTree = true).performScrollTo().performClick()
     waitFor("simple_edit_quantity")
     rule.onNodeWithTag("simple_edit_quantity").performScrollTo().performClick()
     capture("large-stock-keyboard")
@@ -100,12 +117,18 @@ class LiteLargeTextAcceptanceTest {
     rule.onNodeWithText("Cancel").performScrollTo().performClick()
     rule.onNodeWithTag("simple_nav_today").performClick()
     rule.onNodeWithTag("lite_report_sales").assertIsDisplayed()
+    runBlocking { ThemePreferences(context).setThemeMode(ThemeMode.LIGHT) }
+    waitForTheme(true)
+    capture("report-light")
     capture("large-report-english")
     rule.onNodeWithText("SW").performClick()
     waitFor("lite_report_sales")
+    rule.waitUntil(30_000) { rule.onAllNodesWithText("Jumla ya mauzo").fetchSemanticsNodes().isNotEmpty() }
     capture("large-report-swahili")
     rule.onNodeWithText("EN").performClick()
     waitFor("lite_report_sales")
+    runBlocking { ThemePreferences(context).setThemeMode(ThemeMode.DARK) }
+    waitForTheme(false)
     assertEquals(
       original,
       runBlocking {
