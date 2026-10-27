@@ -3,12 +3,14 @@ package com.aistudio.fasmovapos.app
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.closeSoftKeyboard
@@ -108,11 +110,16 @@ class LiteShopAcceptanceTest {
     capture("quantity-$id-$value")
     rule.onNodeWithTag("lite_add_quantity").performClick()
     rule.onNodeWithTag("simple_charge_bar").performClick()
+    waitFor("simple_complete_sale")
+    capture("checkout-$id-$value")
     if (credit) {
-      rule.onNodeWithTag("lite_part_payment").performScrollTo().performClick()
-      rule.onNodeWithTag("lite_received_now").performScrollTo().performTextReplacement("100")
+      rule.onNodeWithTag("simple_charge_list").performScrollToNode(hasTestTag("lite_part_payment"))
+      rule.onNodeWithTag("lite_part_payment").performClick()
+      rule.onNodeWithTag("simple_charge_list").performScrollToNode(hasTestTag("lite_received_now"))
+      rule.onNodeWithTag("lite_received_now").performTextReplacement("100")
       closeSoftKeyboard()
-      rule.onNodeWithTag("simple_choose_customer").performScrollTo().performClick()
+      rule.onNodeWithTag("simple_charge_list").performScrollToNode(hasTestTag("simple_choose_customer"))
+      rule.onNodeWithTag("simple_choose_customer").performClick()
       rule.onNodeWithText("Review Amina").performClick()
       capture("part-payment-and-deni")
     }
@@ -121,6 +128,7 @@ class LiteShopAcceptanceTest {
     waitFor("close_receipt_button")
     capture("receipt-$id-$value")
     rule.onNodeWithTag("close_receipt_button").performClick()
+    rule.waitUntil(10_000) { rule.onAllNodesWithTag("close_receipt_button").fetchSemanticsNodes().isEmpty() }
   }
 
   @Test
@@ -138,6 +146,7 @@ class LiteShopAcceptanceTest {
     rule.onNodeWithTag("login_submit_button").performClick()
     waitFor("simple_nav_pos")
     capture("sell-dark")
+    verifyMeasuredProductEntry()
     sellMeasured("beans", "0.25")
     sellMeasured("beans", "0.5")
     sellMeasured("beans", "1.75", credit = true)
@@ -147,12 +156,21 @@ class LiteShopAcceptanceTest {
     sellMeasured("oil", "0.5")
     sellMeasured("fat", "0.5")
     sellMeasured("rice", "30", budget = true)
-    rule.onNodeWithTag("simple_product_review-water").performScrollTo().performClick()
+    rule.onNodeWithTag("simple_search").performTextReplacement("Water bottle")
+    closeSoftKeyboard()
+    capture("piece-search-water")
     rule.onNodeWithTag("simple_product_review-water").performClick()
+    capture("piece-after-add")
+    waitFor("simple_charge_bar")
     rule.onNodeWithTag("simple_charge_bar").performClick()
+    waitFor("simple_complete_sale")
+    rule.onNodeWithTag("simple_plus_review-water").performClick()
+    capture("piece-checkout-two-bottles")
     rule.onNodeWithTag("simple_complete_sale").performClick()
     waitFor("close_receipt_button")
     rule.onNodeWithTag("close_receipt_button").performClick()
+    rule.onNodeWithTag("simple_search").performTextReplacement("")
+    closeSoftKeyboard()
     rule.onNodeWithTag("simple_nav_more").performClick()
     rule.onNodeWithTag("simple_more_customers").performClick()
     waitFor("record_payment_button_review-buyer")
@@ -245,5 +263,23 @@ class LiteShopAcceptanceTest {
     rule.onNodeWithTag("lite_report_sales").assertIsDisplayed()
     capture("final-report-after-restart-and-restore")
     // Leave the review app open; the task's final capture verifies the installed activity and empty cart.
+  }
+
+  private fun verifyMeasuredProductEntry() {
+    rule.onNodeWithTag("simple_nav_inventory").performClick()
+    rule.onNodeWithTag("simple_add_item").performClick()
+    rule.onNodeWithTag("simple_item_name").performTextReplacement("UI-created grain")
+    rule.onNodeWithTag("lite_unit_Kg").performClick()
+    rule.onNodeWithTag("simple_item_price").performScrollTo().performTextReplacement("200")
+    rule.onNodeWithTag("simple_item_quantity").performScrollTo().performTextReplacement("100")
+    closeSoftKeyboard()
+    capture("measured-product-entry")
+    rule.onNodeWithTag("simple_save_item").performClick()
+    rule.waitUntil(30_000) { runBlocking { repository().products.first().any { it.name == "UI-created grain" } } }
+    val product = runBlocking { repository().products.first().first { it.name == "UI-created grain" } }
+    assertEquals("Kg", product.unit)
+    assertEquals(1000, product.quantityScale)
+    assertEquals(100_000, product.stockQuantity)
+    rule.onNodeWithTag("simple_nav_pos").performClick()
   }
 }

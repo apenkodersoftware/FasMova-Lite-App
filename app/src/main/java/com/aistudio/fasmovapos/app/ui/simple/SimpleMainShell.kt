@@ -98,7 +98,7 @@ fun SimpleMainShell(
         onTabSelect = viewModel::setTab,
       )
     },
-    snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+    snackbarHost = { LiteSnackbarHost(snackbarHostState) },
   ) { innerPadding ->
     Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
       if (currentTab in secondaryTabs) {
@@ -237,4 +237,13 @@ fun SimpleMainShell(
       )
     }
   }
+}
+
+/** Keep save confirmations above the fixed sale/payment actions instead of covering their touch targets. */
+@Composable
+internal fun LiteSnackbarHost(
+  state: SnackbarHostState,
+  modifier: Modifier = Modifier,
+) {
+  SnackbarHost(hostState = state, modifier = modifier.padding(bottom = 80.dp))
 }
